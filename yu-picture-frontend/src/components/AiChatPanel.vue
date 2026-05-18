@@ -53,12 +53,12 @@
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { agentRunStream, getAgentMessages } from '@/api/aiController'
-import { getSpaceVoByIdUsingGet } from '@/api/spaceController'
-import { getOrCreateAgentSessionId } from '@/utils/aiSession'
-import { SPACE_TYPE_ENUM } from '@/constants/space'
-import { emit } from '@/utils/eventBus'
-import { renderAiMessageContent } from '@/utils/aiMessageRender'
+import { agentRunStream, getAgentMessages } from '../api/aiController'
+import { getSpaceVoByIdUsingGet } from '../api/spaceController'
+import { getOrCreateAgentSessionId } from '../utils/aiSession'
+import { SPACE_TYPE_ENUM } from '../constants/space'
+import { emit } from '../utils/eventBus'
+import { renderAiMessageContent } from '../utils/aiMessageRender'
 
 const route = useRoute()
 const visible = ref(false)
@@ -198,10 +198,10 @@ async function sendMessage() {
             case 'plan':
               break
             case 'tool_call':
+              if (event.tool_name === 'analyze_space') break
               const nameMap: Record<string, string> = {
                 search_pictures_by_semantic: '正在语义搜索图片',
                 get_picture_detail: '正在获取图片详情',
-                analyze_space: '正在分析空间数据',
                 edit_picture: '正在批量编辑图片',
               }
               pushProgress(nameMap[event.tool_name] || `正在 ${event.tool_name}...`)
@@ -221,6 +221,7 @@ async function sendMessage() {
               showFinalAnswer(event.answer)
               break
             case 'error':
+              clearProgressMessages()
               messages.value.push({ role: 'assistant', content: event.message || 'AI 处理失败，请稍后重试。' })
               break
           }
@@ -230,6 +231,7 @@ async function sendMessage() {
     }
   } catch (e: any) {
     if (e?.name !== 'AbortError') {
+      clearProgressMessages()
       messages.value.push({ role: 'assistant', content: '抱歉，连接失败，请稍后重试。' })
     }
   } finally {
@@ -237,6 +239,7 @@ async function sendMessage() {
     try {
       await reader?.cancel()
     } catch { /* stream already closed */ }
+    clearProgressMessages()
     if (messages.value.length > 100) messages.value = messages.value.slice(-60)
     loading.value = false
     if (hasPictureEdit) {
@@ -254,12 +257,17 @@ function handleInputKeydown(event: KeyboardEvent) {
 
 function showFinalAnswer(answer?: string) {
   if (!answer) return
+  clearProgressMessages()
   const last = messages.value[messages.value.length - 1]
   if (last && last.role === 'assistant' && !last.type) {
     last.content = answer
     return
   }
   messages.value.push({ role: 'assistant', content: answer })
+}
+
+function clearProgressMessages() {
+  messages.value = messages.value.filter((msg) => msg.type !== 'tool_call')
 }
 
 function pushProgress(content: string) {
@@ -336,6 +344,18 @@ function scrollToBottom() {
 .msg-content :deep(.ai-image-basic-info) {
   font-weight: 500;
   color: #333;
+}
+.msg-content :deep(.ai-report-title) {
+  margin: 10px 0 6px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+.msg-content :deep(.ai-report-row) {
+  margin: 3px 0;
+  line-height: 1.65;
+}
+.msg-content :deep(strong) {
+  font-weight: 700;
 }
 .typing {
   color: #999;

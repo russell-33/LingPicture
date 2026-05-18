@@ -49,10 +49,10 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { agentRunStream, getAgentMessages } from '@/api/aiController'
-import { listSpaceVoByPageUsingPost } from '@/api/spaceController'
-import { getOrCreateAgentSessionId } from '@/utils/aiSession'
-import { renderAiMessageContent } from '@/utils/aiMessageRender'
+import { agentRunStream, getAgentMessages } from '../api/aiController'
+import { listSpaceVoByPageUsingPost } from '../api/spaceController'
+import { getOrCreateAgentSessionId } from '../utils/aiSession'
+import { renderAiMessageContent } from '../utils/aiMessageRender'
 
 const input = ref('')
 const loading = ref(false)
@@ -150,6 +150,7 @@ async function sendMessage() {
       scrollToBottom()
     }
   } catch (e: any) {
+    clearProgressMessages()
     messages.value.push({
       role: 'assistant',
       content: e?.name === 'AbortError' ? '请求超时，请稍后重试。' : '抱歉，连接失败，请稍后重试。',
@@ -159,6 +160,7 @@ async function sendMessage() {
     try {
       await reader?.cancel()
     } catch { /* stream already closed */ }
+    clearProgressMessages()
     loading.value = false
   }
 }
@@ -166,13 +168,13 @@ async function sendMessage() {
 function handleStreamEvent(event: any) {
   switch (event.type) {
     case 'tool_call':
+      if (event.tool_name === 'analyze_space') return
       const toolNames: Record<string, string> = {
         search_pictures_by_semantic: '正在语义搜索图片',
         get_picture_detail: '正在获取图片详情',
-        analyze_space: '正在分析空间数据',
         edit_picture: '正在批量编辑图片',
       }
-      messages.value.push({ role: 'assistant', content: toolNames[event.tool_name] || `正在 ${event.tool_name}...`, type: 'tool_call', toolName: event.tool_name })
+      pushProgress(toolNames[event.tool_name] || `正在 ${event.tool_name}...`, event.tool_name)
       break
     case 'tool_result':
       break
@@ -189,6 +191,7 @@ function handleStreamEvent(event: any) {
       showFinalAnswer(event.answer)
       break
     case 'error':
+      clearProgressMessages()
       messages.value.push({ role: 'assistant', content: event.message || 'AI 处理失败，请稍后重试。' })
       break
   }
@@ -203,12 +206,27 @@ function handleInputKeydown(event: KeyboardEvent) {
 
 function showFinalAnswer(answer?: string) {
   if (!answer) return
+  clearProgressMessages()
   const lastMsg = messages.value[messages.value.length - 1]
   if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.type) {
     lastMsg.content = answer
     return
   }
   messages.value.push({ role: 'assistant', content: answer })
+}
+
+function clearProgressMessages() {
+  messages.value = messages.value.filter((msg) => msg.type !== 'tool_call')
+}
+
+function pushProgress(content: string, toolName?: string) {
+  const lastMsg = messages.value[messages.value.length - 1]
+  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.type === 'tool_call') {
+    lastMsg.content = content
+    lastMsg.toolName = toolName
+    return
+  }
+  messages.value.push({ role: 'assistant', content, type: 'tool_call', toolName })
 }
 
 function scrollToBottom() {
@@ -269,6 +287,18 @@ function scrollToBottom() {
 .bubble-text :deep(.ai-image-basic-info) {
   font-weight: 500;
   color: #333;
+}
+.bubble-text :deep(.ai-report-title) {
+  margin: 10px 0 6px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+.bubble-text :deep(.ai-report-row) {
+  margin: 3px 0;
+  line-height: 1.65;
+}
+.bubble-text :deep(strong) {
+  font-weight: 700;
 }
 .typing {
   color: #999;
