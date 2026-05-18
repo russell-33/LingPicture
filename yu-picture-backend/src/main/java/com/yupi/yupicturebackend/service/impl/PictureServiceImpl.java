@@ -180,6 +180,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return true;
         });
+        syncPictureIndex(picture);
         return PictureVO.objToVo(picture);
     }
 
@@ -487,6 +488,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 操作数据库
         boolean result = this.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        syncPictureIndex(this.getById(id));
     }
 
     @Override
@@ -563,6 +565,36 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         //操作数据库
         boolean result = this.updateBatchById(oldPictures);
         throwIf(!result, ErrorCode.OPERATION_ERROR, "批量编辑失败");
+        this.listByIds(oldPictures.stream().map(Picture::getId).collect(Collectors.toList()))
+                .forEach(this::syncPictureIndex);
+    }
+
+    @Override
+    public void syncPictureIndex(Picture picture) {
+        if (picture == null || picture.getId() == null) {
+            return;
+        }
+        aiPictureIndexClient.upsertPictureIndex(
+                picture.getId(),
+                picture.getSpaceId(),
+                picture.getName(),
+                picture.getIntroduction(),
+                picture.getCategory(),
+                parseTags(picture.getTags()),
+                picture.getUrl()
+        );
+    }
+
+    private List<String> parseTags(String tagsJson) {
+        if (StrUtil.isBlank(tagsJson) || "null".equalsIgnoreCase(tagsJson)) {
+            return Collections.emptyList();
+        }
+        try {
+            return JSONUtil.parseArray(tagsJson).toList(String.class);
+        } catch (Exception e) {
+            log.warn("解析图片标签失败，tags={}, error={}", tagsJson, e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     @Override
@@ -602,6 +634,5 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
     }
 }
-
 
 

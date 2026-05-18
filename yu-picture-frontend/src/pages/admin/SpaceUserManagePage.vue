@@ -60,7 +60,7 @@ import {
   deleteSpaceUserUsingPost,
   editSpaceUserUsingPost,
   listSpaceUserUsingPost,
-} from '@/api/spaceUserController.ts'
+} from '../../api/spaceUserController.ts'
 import dayjs from 'dayjs'
 
 interface Props {

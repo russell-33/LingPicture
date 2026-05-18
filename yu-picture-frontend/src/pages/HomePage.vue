@@ -46,9 +46,9 @@ import { onMounted, reactive, ref } from 'vue'
 import {
   listPictureTagCategoryUsingGet,
   listPictureVoByPageUsingPost,
-} from '@/api/pictureController.ts'
+} from '../api/pictureController.ts'
 import { message } from 'ant-design-vue'
-import PictureList from '@/components/PictureList.vue' // 定义数据
+import PictureList from '../components/PictureList.vue' // 定义数据
 
 // 定义数据
 const dataList = ref<API.PictureVO[]>([])

@@ -6,11 +6,11 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
-import { listSpaceVoByPageUsingPost } from '@/api/spaceController.ts'
+import { useLoginUserStore } from '../stores/useLoginUserStore.ts'
+import { listSpaceVoByPageUsingPost } from '../api/spaceController.ts'
 import { message } from 'ant-design-vue'
 import { onMounted } from 'vue'
-import { SPACE_TYPE_ENUM } from '@/constants/space.ts'
+import { SPACE_TYPE_ENUM } from '../constants/space.ts'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()

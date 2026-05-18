@@ -1,4 +1,4 @@
-import myAxios from '@/request'
+import myAxios from '../request'
 
 const API_BASE_URL = myAxios.defaults.baseURL || ''
 

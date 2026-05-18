@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import request from '@/request'
+import request from '../request'
 
 /** getSpaceCategoryAnalyze POST /api/space/analyze/category */
 export async function getSpaceCategoryAnalyzeUsingPost(

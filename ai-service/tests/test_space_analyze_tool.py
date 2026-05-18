@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+from src.service.expert_analyst import ANALYST_TOOL_NAMES
+from src.service.prompt import ANALYST_SYSTEM_PROMPT, SPACE_ANALYZE_PROMPT
 from src.tools.space_analyze import analyze_space
 
 
@@ -55,6 +57,14 @@ class SpaceAnalyzeToolTest(unittest.TestCase):
         self.assertIn("usedCount=0", result)
         self.assertIn("聚合字段", result)
         chat.assert_not_called()
+
+    def test_space_analyze_prompt_respects_fixed_category_options(self):
+        prompt_text = "\n".join(message.prompt.template for message in SPACE_ANALYZE_PROMPT.messages)
+
+        self.assertIn("模板、电商、表情包、素材、海报、其他", prompt_text)
+        self.assertIn("严禁建议用户“新建分类”", prompt_text)
+        self.assertIn("不要建议新建分类", ANALYST_SYSTEM_PROMPT)
+        self.assertNotIn("get_picture_detail", ANALYST_TOOL_NAMES)
 
 
 if __name__ == "__main__":

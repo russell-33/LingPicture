@@ -149,6 +149,7 @@ public class PictureController {
         // 操作数据库
         boolean result = pictureService.updateById(picture);
         throwIf(!result, ErrorCode.OPERATION_ERROR);
+        pictureService.syncPictureIndex(pictureService.getById(id));
         return ResultUtils.success(true);
     }
 
@@ -358,6 +359,7 @@ public class PictureController {
         picture.setEditTime(new Date());
         boolean result = pictureService.updateById(picture);
         throwIf(!result, ErrorCode.OPERATION_ERROR);
+        pictureService.syncPictureIndex(pictureService.getById(id));
         return ResultUtils.success(true);
     }
 

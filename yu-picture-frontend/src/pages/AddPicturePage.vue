@@ -78,8 +78,8 @@
       <a-form-item name="tags" label="标签">
         <a-select
           v-model:value="pictureForm.tags"
-          mode="multiple"
-          placeholder="请选择标签"
+          mode="tags"
+          placeholder="请选择或输入标签"
           :options="tagOptions"
           allow-clear
         />
@@ -92,21 +92,21 @@
 </template>
 
 <script setup lang="ts">
-import PictureUpload from '@/components/PictureUpload.vue'
+import PictureUpload from '../components/PictureUpload.vue'
 import { computed, h, onMounted, reactive, ref, watchEffect } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   editPictureUsingPost,
   getPictureVoByIdUsingGet,
   listPictureTagCategoryUsingGet,
-} from '@/api/pictureController.ts'
+} from '../api/pictureController.ts'
 import { useRoute, useRouter } from 'vue-router'
-import UrlPictureUpload from '@/components/UrlPictureUpload.vue'
-import ImageCropper from '@/components/ImageCropper.vue'
+import UrlPictureUpload from '../components/UrlPictureUpload.vue'
+import ImageCropper from '../components/ImageCropper.vue'
 import { EditOutlined, FullscreenOutlined } from '@ant-design/icons-vue'
-import ImageOutPainting from '@/components/ImageOutPainting.vue'
-import { getSpaceVoByIdUsingGet } from '@/api/spaceController.ts'
-import { autoTag, hasAutoTagContent, unwrapAutoTagResult } from '@/api/aiController'
+import ImageOutPainting from '../components/ImageOutPainting.vue'
+import { getSpaceVoByIdUsingGet } from '../api/spaceController.ts'
+import { autoTag, hasAutoTagContent, unwrapAutoTagResult } from '../api/aiController'
 
 const router = useRouter()
 const route = useRoute()

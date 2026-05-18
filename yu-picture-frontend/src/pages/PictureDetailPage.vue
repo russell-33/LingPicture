@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { deletePictureUsingPost, getPictureVoByIdUsingGet } from '@/api/pictureController.ts'
+import { deletePictureUsingPost, getPictureVoByIdUsingGet } from '../api/pictureController.ts'
 import { message } from 'ant-design-vue'
 import {
   DeleteOutlined,
@@ -105,10 +105,10 @@ import {
   ShareAltOutlined,
 } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
-import { downloadImage, formatSize, toHexColor } from '@/utils'
-import ShareModal from '@/components/ShareModal.vue'
-import { SPACE_PERMISSION_ENUM } from '@/constants/space.ts'
-import { autoTag, hasAutoTagContent, unwrapAutoTagResult } from '@/api/aiController'
+import { downloadImage, formatSize, toHexColor } from '../utils'
+import ShareModal from '../components/ShareModal.vue'
+import { SPACE_PERMISSION_ENUM } from '../constants/space.ts'
+import { autoTag, hasAutoTagContent, unwrapAutoTagResult } from '../api/aiController'
 
 interface Props {
   id: string | number

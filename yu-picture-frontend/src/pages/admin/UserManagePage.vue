@@ -44,7 +44,7 @@
 </template>
 <script lang="ts" setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { deleteUserUsingPost, listUserVoByPageUsingPost } from '@/api/userController.ts'
+import { deleteUserUsingPost, listUserVoByPageUsingPost } from '../../api/userController.ts'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 

@@ -23,8 +23,8 @@
       <a-form-item label="标签">
         <a-select
           v-model:value="searchParams.tags"
-          mode="multiple"
-          placeholder="请选择标签"
+          mode="tags"
+          placeholder="请选择或输入标签"
           style="min-width: 180px"
           :options="tagOptions"
           allow-clear
@@ -115,7 +115,7 @@ import {
   doPictureReviewUsingPost,
   listPictureByPageUsingPost,
   listPictureTagCategoryUsingGet,
-} from '@/api/pictureController.ts'
+} from '../../api/pictureController.ts'
 import { message } from 'ant-design-vue'
 import {
   PIC_REVIEW_STATUS_ENUM,

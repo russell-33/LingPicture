@@ -44,9 +44,9 @@ import {
   getSpaceVoByIdUsingGet,
   listSpaceLevelUsingGet,
   updateSpaceUsingPost,
-} from '@/api/spaceController.ts'
+} from '../api/spaceController.ts'
 import { useRoute, useRouter } from 'vue-router'
-import {SPACE_LEVEL_MAP, SPACE_LEVEL_OPTIONS, SPACE_TYPE_ENUM, SPACE_TYPE_MAP} from '@/constants/space.ts'
+import {SPACE_LEVEL_MAP, SPACE_LEVEL_OPTIONS, SPACE_TYPE_ENUM, SPACE_TYPE_MAP} from '../constants/space.ts'
 import { formatSize } from '../utils'
 
 const space = ref<API.SpaceVO>()

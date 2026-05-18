@@ -43,7 +43,7 @@ import { computed, onMounted, ref } from 'vue'
 import {
   getPictureVoByIdUsingGet,
   searchPictureByPictureUsingPost,
-} from '@/api/pictureController.ts'
+} from '../api/pictureController.ts'
 import { message } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 

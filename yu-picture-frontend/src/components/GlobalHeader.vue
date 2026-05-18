@@ -55,8 +55,8 @@ import { computed, h, ref } from 'vue'
 import { HomeOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { MenuProps, message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
-import { userLogoutUsingPost } from '@/api/userController.ts'
+import { useLoginUserStore } from '../stores/useLoginUserStore.ts'
+import { userLogoutUsingPost } from '../api/userController.ts'
 
 const loginUserStore = useLoginUserStore()
 

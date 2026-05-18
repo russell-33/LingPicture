@@ -1,5 +1,5 @@
-import router from '@/router'
-import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
+import router from './router'
+import { useLoginUserStore } from './stores/useLoginUserStore.ts'
 import { message } from 'ant-design-vue'
 
 // 是否为首次获取登录用户

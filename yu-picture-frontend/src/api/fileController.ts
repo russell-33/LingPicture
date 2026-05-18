@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import request from '@/request'
+import request from '../request'
 
 /** testDownloadFile GET /api/file/test/download/ */
 export async function testDownloadFileUsingGet(

@@ -136,6 +136,13 @@ public interface PictureService extends IService<Picture> {
      */
     void editPictureByBatch(PictureEditByBatchRequest pictureEditByBatchRequest, User loginUser);
 
+    /**
+     * 同步图片索引到 AI 服务
+     *
+     * @param picture
+     */
+    void syncPictureIndex(Picture picture);
+
 
     /**
      * 创建扩图任务

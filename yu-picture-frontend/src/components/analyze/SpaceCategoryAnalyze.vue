@@ -10,7 +10,7 @@
 import VChart from 'vue-echarts'
 import 'echarts'
 import { computed, ref, watchEffect } from 'vue'
-import { getSpaceCategoryAnalyzeUsingPost } from '@/api/spaceAnalyzeController.ts'
+import { getSpaceCategoryAnalyzeUsingPost } from '../../api/spaceAnalyzeController.ts'
 import { message } from 'ant-design-vue'
 
 interface Props {

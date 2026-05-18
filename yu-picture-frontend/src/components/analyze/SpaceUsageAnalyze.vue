@@ -24,9 +24,9 @@
 
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import { getSpaceUsageAnalyzeUsingPost } from '@/api/spaceAnalyzeController.ts'
+import { getSpaceUsageAnalyzeUsingPost } from '../../api/spaceAnalyzeController.ts'
 import { message } from 'ant-design-vue'
-import { formatSize } from '@/utils'
+import { formatSize } from '../../utils'
 
 interface Props {
   queryAll?: boolean

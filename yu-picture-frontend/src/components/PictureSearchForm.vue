@@ -22,8 +22,8 @@
         <a-select
           v-model:value="searchParams.tags"
           style="min-width: 180px"
-          mode="multiple"
-          placeholder="请选择标签"
+          mode="tags"
+          placeholder="请选择或输入标签"
           :options="tagOptions"
           allow-clear
         />
@@ -66,7 +66,7 @@
 <script lang="ts" setup>
 import { onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
-import {listPictureTagCategoryUsingGet, listPictureVoByPageUsingPost} from '@/api/pictureController.ts'
+import {listPictureTagCategoryUsingGet, listPictureVoByPageUsingPost} from '../api/pictureController.ts'
 import { message } from 'ant-design-vue'
 
 interface Props {

@@ -15,8 +15,8 @@
         <a-form-item name="tags" label="标签">
           <a-select
             v-model:value="formData.tags"
-            mode="multiple"
-            placeholder="请选择标签"
+            mode="tags"
+            placeholder="请选择或输入标签"
             :options="tagOptions"
             allow-clear
           />
@@ -40,7 +40,7 @@ import { onMounted, reactive, ref } from 'vue'
 import {
   editPictureByBatchUsingPost,
   listPictureTagCategoryUsingGet,
-} from '@/api/pictureController.ts'
+} from '../api/pictureController.ts'
 import { message } from 'ant-design-vue'
 
 interface Props {

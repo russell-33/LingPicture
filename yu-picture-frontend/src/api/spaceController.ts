@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import request from '@/request'
+import request from '../request'
 
 /** addSpace POST /api/space/add */
 export async function addSpaceUsingPost(

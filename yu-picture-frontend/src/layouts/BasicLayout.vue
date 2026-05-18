@@ -16,9 +16,9 @@
 </template>
 
 <script setup lang="ts">
-import GlobalHeader from '@/components/GlobalHeader.vue'
-import GlobalSider from "@/components/GlobalSider.vue";
-import AiChatPanel from "@/components/AiChatPanel.vue";
+import GlobalHeader from '../components/GlobalHeader.vue'
+import GlobalSider from "../components/GlobalSider.vue";
+import AiChatPanel from "../components/AiChatPanel.vue";
 </script>
 
 <style scoped>

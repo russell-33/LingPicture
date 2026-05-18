@@ -39,7 +39,7 @@ import {
   getPictureVoByIdUsingGet,
   listPictureTagCategoryUsingGet,
   uploadPictureByBatchUsingPost,
-} from '@/api/pictureController.ts'
+} from '../api/pictureController.ts'
 import { useRoute, useRouter } from 'vue-router'
 
 const formData = reactive<API.PictureUploadByBatchRequest>({

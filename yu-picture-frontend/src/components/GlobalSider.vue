@@ -19,9 +19,9 @@
 import { computed, h, ref, watchEffect } from 'vue'
 import { PictureOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
-import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
-import { SPACE_TYPE_ENUM } from '@/constants/space.ts'
-import { listMyTeamSpaceUsingPost } from '@/api/spaceUserController.ts'
+import { useLoginUserStore } from '../stores/useLoginUserStore.ts'
+import { SPACE_TYPE_ENUM } from '../constants/space.ts'
+import { listMyTeamSpaceUsingPost } from '../api/spaceUserController.ts'
 import { message } from 'ant-design-vue'
 
 const loginUserStore = useLoginUserStore()

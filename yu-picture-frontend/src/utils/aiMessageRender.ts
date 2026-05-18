@@ -24,6 +24,11 @@ export function renderAiMessageContent(text: string): string {
     '<a href="/picture/$2" target="_blank" class="ai-picture-link">$1</a>',
   )
 
+  html = html
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\s*#{1,3}\s*(.+)$/gm, '<div class="ai-report-title">$1</div>')
+    .replace(/^\s*[-*]\s+(.+)$/gm, '<div class="ai-report-row">• $1</div>')
+
   return html.replace(/\n/g, '<br>')
 }
 

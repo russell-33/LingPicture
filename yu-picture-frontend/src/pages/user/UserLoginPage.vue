@@ -27,10 +27,10 @@
 </template>
 <script lang="ts" setup>
 import { reactive } from 'vue'
-import { userLoginUsingPost } from '@/api/userController.ts'
-import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
+import { userLoginUsingPost } from '../../api/userController.ts'
+import { useLoginUserStore } from '../../stores/useLoginUserStore.ts'
 import { message } from 'ant-design-vue'
-import router from '@/router' // 用于接受表单输入的值
+import router from '../../router' // 用于接受表单输入的值
 
 // 用于接受表单输入的值
 const formState = reactive<API.UserLoginRequest>({

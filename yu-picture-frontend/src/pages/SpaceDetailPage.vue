@@ -79,18 +79,18 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
-import { getSpaceVoByIdUsingGet } from '@/api/spaceController.ts'
+import { getSpaceVoByIdUsingGet } from '../api/spaceController.ts'
 import { message } from 'ant-design-vue'
 import {
   listPictureVoByPageUsingPost,
   searchPictureByColorUsingPost,
-} from '@/api/pictureController.ts'
-import { formatSize } from '@/utils'
-import PictureList from '@/components/PictureList.vue'
-import PictureSearchForm from '@/components/PictureSearchForm.vue'
+} from '../api/pictureController.ts'
+import { formatSize } from '../utils'
+import PictureList from '../components/PictureList.vue'
+import PictureSearchForm from '../components/PictureSearchForm.vue'
 import { ColorPicker } from 'vue3-colorpicker'
 import 'vue3-colorpicker/style.css'
-import BatchEditPictureModal from '@/components/BatchEditPictureModal.vue'
+import BatchEditPictureModal from '../components/BatchEditPictureModal.vue'
 import { BarChartOutlined, EditOutlined, TeamOutlined } from '@ant-design/icons-vue'
 import { SPACE_PERMISSION_ENUM, SPACE_TYPE_MAP } from '../constants/space.ts'
 import { useRouter } from 'vue-router'
