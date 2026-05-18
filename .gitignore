@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Local documents
+YUNPICTURE_INTERVIEW_QA.md
+md/
+.md/
+
+# Java / Maven
+target/
+build/
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+
+# Python / AI service
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+ai-service/data/
+data/
+
+# Local config
+.env
+.env.*
+!.env.example
+!.env.*.example
+docker-compose.yml
+*.local
+application-local.yml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr

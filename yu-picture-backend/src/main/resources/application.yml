@@ -1,0 +1,97 @@
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+    session:
+      cookie:
+        max-age: 2592000
+
+spring:
+  application:
+    name: yu-picture-backend
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/yp_picture?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    database: ${REDIS_DATABASE:3}
+    port: ${REDIS_PORT:6379}
+    timeout: 5000
+
+  session:
+    store-type: redis
+    timeout: 2592000
+
+  servlet:
+    multipart:
+      max-file-size: 3MB
+
+  shardingsphere:
+    datasource:
+      names: yp_picture
+      yp_picture:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: ${MYSQL_SHARDING_URL:jdbc:mysql://localhost:3306/yp_picture}
+        username: ${MYSQL_USERNAME:root}
+        password: ${MYSQL_PASSWORD:}
+    rules:
+      sharding:
+        tables:
+          picture:
+            actual-data-nodes: yp_picture.picture
+            table-strategy:
+              standard:
+                sharding-column: spaceId
+                sharding-algorithm-name: picture_sharding_algorithm
+        sharding-algorithms:
+          picture_sharding_algorithm:
+            type: CLASS_BASED
+            props:
+              strategy: standard
+              algorithmClassName: com.yupi.yupicturebackend.manager.sharding.PictureShardingAlgorithm
+    props:
+      sql-show: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    enable-sql-runner: true
+
+knife4j:
+  enable: true
+  openapi:
+    title: 灵图空间接口文档
+    version: v1.0
+    group:
+      default:
+        group-name: 默认分组
+        api-rule: package
+        api-rule-resources:
+          - com.yupi.yupicturebackend.controller
+
+cos:
+  client:
+    host: ${COS_HOST:}
+    secretId: ${COS_SECRET_ID:}
+    secretKey: ${COS_SECRET_KEY:}
+    region: ${COS_REGION:}
+    bucket: ${COS_BUCKET:}
+
+aliyunAi:
+  apiKey: ${ALIYUN_AI_API_KEY:}
+
+ai:
+  service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+    internal-token: ${AI_INTERNAL_TOKEN:}
