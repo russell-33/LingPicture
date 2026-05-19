@@ -7,7 +7,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -33,7 +32,6 @@ public class AiPictureIndexClient {
     @Resource
     private AiInternalAuth aiInternalAuth;
 
-    @Async
     public void upsertPictureIndex(Long pictureId,
                                    Long spaceId,
                                    String name,
@@ -47,7 +45,7 @@ public class AiPictureIndexClient {
         long indexSpaceId = spaceId == null ? 0L : spaceId;
         String url = trimTrailingSlash(aiConfig.getUrl()) + "/api/v1/rag/picture/build-index";
         String tagText = tags == null ? "" : String.join(",", tags);
-        String description = String.format("名称：%s。简介：%s。标签：%s。分类：%s。",
+        String description = String.format("%s：%s。标签：%s。分类：%s。",
                 nullToEmpty(name), nullToEmpty(introduction), tagText, nullToEmpty(category));
 
         Map<String, Object> body = new HashMap<>();
@@ -65,10 +63,10 @@ public class AiPictureIndexClient {
             aiRestTemplate.postForEntity(url, entity, String.class);
         } catch (RestClientException e) {
             log.warn("刷新 AI 图片索引失败，pictureId={}, spaceId={}, error={}", pictureId, indexSpaceId, e.getMessage());
+            throw e;
         }
     }
 
-    @Async
     public void removePictureIndex(Long pictureId, Long spaceId) {
         if (pictureId == null || pictureId <= 0) {
             return;
@@ -85,6 +83,7 @@ public class AiPictureIndexClient {
             aiRestTemplate.exchange(url, HttpMethod.DELETE, entity, String.class);
         } catch (RestClientException e) {
             log.warn("清理 AI 图片索引失败，pictureId={}, spaceId={}, error={}", pictureId, indexSpaceId, e.getMessage());
+            throw e;
         }
     }
 

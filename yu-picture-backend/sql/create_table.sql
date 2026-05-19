@@ -137,6 +137,26 @@ create table if not exists agent_operation_log
 ) comment 'Agent 业务操作记录' collate = utf8mb4_unicode_ci;
 
 
+-- 图片 AI 索引 outbox 表
+create table if not exists picture_index_outbox
+(
+    id            bigint auto_increment comment 'id' primary key,
+    eventType     varchar(32)                         not null comment '事件类型：UPSERT/DELETE',
+    pictureId     bigint                              not null comment '图片 id',
+    spaceId       bigint                              null comment '空间 id',
+    payload       text                                not null comment '索引消息 JSON',
+    status        varchar(32) default 'PENDING'       not null comment '状态：PENDING/SENT/FAILED',
+    retryCount    int         default 0               not null comment '重试次数',
+    lastError     varchar(512)                        null comment '最近错误',
+    nextRetryTime datetime                            null comment '下次补发时间',
+    createTime    datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime    datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    index idx_status_nextRetryTime (status, nextRetryTime),
+    index idx_pictureId (pictureId),
+    index idx_spaceId (spaceId)
+) comment '图片 AI 索引 outbox' collate = utf8mb4_unicode_ci;
+
+
 -- 空间成员表
 create table if not exists space_user
 (
@@ -151,6 +171,5 @@ create table if not exists space_user
     INDEX idx_spaceId (spaceId),                    -- 提升按空间查询的性能
     INDEX idx_userId (userId)                       -- 提升按用户查询的性能
 ) comment '空间用户关联' collate = utf8mb4_unicode_ci;
-
 
 

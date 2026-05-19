@@ -6,7 +6,6 @@ from src.service.llm import get_llm_client
 from src.service.prompt import AUTO_TAG_PROMPT
 from src.core.structured import parse_json_response, PictureAutoTagResult
 from src.core.tag_schema import normalize_allowed_tags
-from src.vector_store.chroma_store import add_picture_index
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +61,5 @@ def _auto_tag_single(picture_id: int, image_url: str, picture_name: str = "", sp
     except Exception as e:
         logger.warning(f"Failed to write metadata to Java backend: {e}")
 
-    # Step 4: 生成的描述向量化存入 ChromaDB
-    try:
-        desc = f"{result.name}：{result.introduction}。标签：{','.join(result.tags)}。分类：{result.category}。"
-        add_picture_index(space_id, picture_id, desc, {"picture_name": result.name, "url": image_url})
-    except Exception as e:
-        logger.warning(f"Failed to index picture in ChromaDB: {e}")
 
     return result.model_dump()

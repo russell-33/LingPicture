@@ -9,10 +9,10 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yupi.yupicturebackend.api.ai.AiPictureIndexClient;
 import com.yupi.yupicturebackend.api.aliyunai.AliYunAiApi;
 import com.yupi.yupicturebackend.api.aliyunai.model.CreateOutPaintingTaskRequest;
 import com.yupi.yupicturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
+import com.yupi.yupicturebackend.manager.mq.PictureIndexMessageProducer;
 import com.yupi.yupicturebackend.model.enums.PictureReviewStatusEnum;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
@@ -24,12 +24,14 @@ import com.yupi.yupicturebackend.manager.upload.UrlPictureUpload;
 import com.yupi.yupicturebackend.model.dto.file.UploadPictureResult;
 import com.yupi.yupicturebackend.model.dto.picture.*;
 import com.yupi.yupicturebackend.model.entity.Picture;
+import com.yupi.yupicturebackend.model.entity.PictureIndexOutbox;
 import com.yupi.yupicturebackend.model.entity.Space;
 import com.yupi.yupicturebackend.model.entity.User;
 import com.yupi.yupicturebackend.model.vo.PictureVO;
 import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.mapper.PictureMapper;
+import com.yupi.yupicturebackend.service.PictureIndexOutboxService;
 import com.yupi.yupicturebackend.service.SpaceService;
 import com.yupi.yupicturebackend.service.UserService;
 import com.yupi.yupicturebackend.utils.ColorSimilarUtils;
@@ -79,7 +81,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Resource
     private AliYunAiApi aliYunAiApi;
     @Resource
-    private AiPictureIndexClient aiPictureIndexClient;
+    private PictureIndexOutboxService pictureIndexOutboxService;
+    @Resource
+    private PictureIndexMessageProducer pictureIndexMessageProducer;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -180,7 +184,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return true;
         });
-        syncPictureIndex(picture);
         return PictureVO.objToVo(picture);
     }
 
@@ -461,7 +464,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return true;
         });
-        aiPictureIndexClient.removePictureIndex(picture.getId(), finalSpaceId);
+        PictureIndexOutbox event = pictureIndexOutboxService.createDeleteEvent(picture.getId(), finalSpaceId);
+        pictureIndexMessageProducer.publishOutboxEvent(event);
         //删除cos中的文件
         this.clearPictureFile(picture);
     }
@@ -574,27 +578,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (picture == null || picture.getId() == null) {
             return;
         }
-        aiPictureIndexClient.upsertPictureIndex(
-                picture.getId(),
-                picture.getSpaceId(),
-                picture.getName(),
-                picture.getIntroduction(),
-                picture.getCategory(),
-                parseTags(picture.getTags()),
-                picture.getUrl()
-        );
-    }
-
-    private List<String> parseTags(String tagsJson) {
-        if (StrUtil.isBlank(tagsJson) || "null".equalsIgnoreCase(tagsJson)) {
-            return Collections.emptyList();
-        }
-        try {
-            return JSONUtil.parseArray(tagsJson).toList(String.class);
-        } catch (Exception e) {
-            log.warn("解析图片标签失败，tags={}, error={}", tagsJson, e.getMessage());
-            return Collections.emptyList();
-        }
+        PictureIndexOutbox event = pictureIndexOutboxService.createUpsertEvent(picture);
+        pictureIndexMessageProducer.publishOutboxEvent(event);
     }
 
     @Override
@@ -634,5 +619,4 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
     }
 }
-
 
