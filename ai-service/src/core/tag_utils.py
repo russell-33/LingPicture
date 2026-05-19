@@ -54,6 +54,12 @@ def extract_remove_tag(text: str) -> str:
 
 def extract_add_tag(text: str) -> str:
     content = str(text or "")
+    explicit = re.search(r'tags\s*=\s*["\']([^"\']+)["\']', content, flags=re.IGNORECASE)
+    if explicit:
+        tag = clean_tag(explicit.group(1))
+        if tag:
+            return tag
+
     patterns = [
         r"(?:加上|添加|新增|打上)\s*([^，。；\n]+?)\s*标签",
         r"加\s*([^，。；\n]+?)\s*标签",

@@ -8,7 +8,7 @@ from langgraph.graph import StateGraph, END
 from src.service.llm import get_llm_client, _normalize_messages
 from src.service.prompt import PLAN_PROMPT
 from src.core.multi_agent_state import MultiAgentState, SubTask
-from src.core.tag_utils import extract_remove_tag
+from src.core.tag_utils import extract_add_tag, extract_remove_tag
 from src.service.expert_searcher import build_searcher_agent
 from src.service.expert_editor import build_editor_agent
 from src.service.expert_analyst import build_analyst_agent
@@ -59,6 +59,7 @@ def _extract_json_array(content: str) -> str:
 
 def _normalize_plan_description(description: str, agent: str, task_text: str) -> str:
     remove_tag = extract_remove_tag(task_text)
+    add_tag = extract_add_tag(task_text)
     if remove_tag and agent == "searcher":
         return (
             f'按业务标签搜索当前空间中包含 "{remove_tag}" 标签的图片，'
@@ -70,6 +71,8 @@ def _normalize_plan_description(description: str, agent: str, task_text: str) ->
 
     if remove_tag and "remove_tags" not in description:
         return f'{description}；使用 edit_picture(remove_tags="{remove_tag}")'
+    if add_tag and "tags" not in description and "remove_tags" not in description:
+        return f'{description}；使用 edit_picture(tags="{add_tag}")'
     return description
 
 
@@ -386,12 +389,15 @@ def supervisor_node(state: MultiAgentState) -> dict:
 
 def _run_expert(expert_app, state: MultiAgentState, max_steps: int = 6) -> dict:
     """通用专家执行：运行专家子图，只将最终摘要返回给主图。"""
+    from src.core.memory import load_tool_context
     plan = state.get("plan", [])
     current_id = state.get("current_subtask", "")
+    # 重新加载最新的 tool_context，确保后续专家能看到前面专家保存的工具结果
+    fresh_tool_context = load_tool_context(state.get("session_id", ""))
     task_desc = _build_expert_task_description(
         plan,
         current_id,
-        state.get("tool_context", {}),
+        fresh_tool_context,
         state.get("current_task", ""),
     )
 

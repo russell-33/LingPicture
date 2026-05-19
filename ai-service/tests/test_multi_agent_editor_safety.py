@@ -2,7 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from src.core.tag_utils import extract_remove_tag, extract_remove_tags
+from src.core.tag_utils import extract_add_tag, extract_remove_tag, extract_remove_tags
 from src.service.expert_common import make_agent_node, make_execute_tools
 
 
@@ -12,6 +12,11 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
 
         self.assertEqual(["Racing Car", "Racing"], extract_remove_tags(text))
         self.assertEqual("Racing Car,Racing", extract_remove_tag(text))
+
+    def test_extracts_explicit_add_tag_hint(self):
+        text = '为这些图片添加标签；使用 edit_picture(tags="赛车")'
+
+        self.assertEqual("赛车", extract_add_tag(text))
 
     def test_editor_directly_calls_edit_picture_for_upstream_ids_and_multiple_remove_tags(self):
         node = make_agent_node("你是图片编辑专家。", {"edit_picture", "get_picture_detail"})
@@ -61,6 +66,43 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
             "task_description": (
                 "当前子任务：给关于赛车的图加上赛车标签\n"
                 "从上游结果中提取到的 picture_ids：2052600060341587969,2052598748216516609"
+            ),
+            "space_id": "2019703681948540929",
+            "user_id": 7,
+            "session_id": "",
+            "step_count": 1,
+            "max_steps": 4,
+        }
+
+        with patch("src.service.expert_common.execute_tool", return_value="成功编辑 2/2 张图片。") as tool:
+            execute_tools(state)
+
+        args = tool.call_args.args[1]
+        self.assertEqual("赛车", args["tags"])
+        self.assertEqual("", args.get("remove_tags", ""))
+
+    def test_add_tag_task_fills_missing_tags_from_explicit_hint(self):
+        execute_tools = make_execute_tools(
+            {"edit_picture"},
+            inject_user_id_tools={"edit_picture"},
+            use_memory=False,
+        )
+        state = {
+            "messages": [{
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-1",
+                    "function": {
+                        "name": "edit_picture",
+                        "arguments": json.dumps({
+                            "picture_ids": "2056647696043470849,2056707647105396738",
+                        }, ensure_ascii=False),
+                    },
+                }],
+            }],
+            "task_description": (
+                "当前子任务：为这些图片添加标签；使用 edit_picture(tags=\"赛车\")\n"
+                "根据当前用户指代解析出的 picture_ids：2056647696043470849,2056707647105396738"
             ),
             "space_id": "2019703681948540929",
             "user_id": 7,

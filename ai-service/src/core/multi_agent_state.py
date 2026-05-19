@@ -27,7 +27,7 @@ class MultiAgentState(TypedDict):
 
 
 class ExpertState(TypedDict):
-    messages: list[dict]
+    messages: Annotated[list[dict], operator.add]
     task_description: str
     space_id: str
     user_id: int

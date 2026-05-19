@@ -272,6 +272,39 @@ def make_should_continue(node_prefix: str):
     return should_continue
 
 
+def make_after_tools_route(node_prefix: str):
+    """工具执行后的路由。
+
+    默认工具执行后直接总结。editor 如果刚执行的是 get_picture_detail，
+    需要回到 agent 继续判断是否调用 edit_picture。
+    """
+
+    def after_tools(state: ExpertState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return f"{node_prefix}_respond"
+        if not node_prefix.startswith("editor"):
+            return f"{node_prefix}_respond"
+
+        last_tool_names = []
+        for message in reversed(state.get("messages", [])):
+            if not isinstance(message, dict):
+                continue
+            tool_calls = message.get("tool_calls")
+            if tool_calls:
+                last_tool_names = [
+                    tc.get("function", {}).get("name", "")
+                    for tc in tool_calls
+                    if isinstance(tc, dict)
+                ]
+                break
+
+        if last_tool_names and "edit_picture" not in last_tool_names and "get_picture_detail" in last_tool_names:
+            return f"{node_prefix}_agent"
+        return f"{node_prefix}_respond"
+
+    return after_tools
+
+
 def make_execute_tools(tool_names: Set[str],
                        inject_user_id_tools: Optional[Set[str]] = None,
                        persist_tools: Optional[Set[str]] = None,
@@ -413,7 +446,10 @@ def build_expert_graph(prefix: str, system_prompt: str, tool_names: Set[str],
         f"{prefix}_tools": f"{prefix}_tools",
         f"{prefix}_respond": f"{prefix}_respond",
     })
-    graph.add_edge(f"{prefix}_tools", f"{prefix}_respond")
+    graph.add_conditional_edges(f"{prefix}_tools", make_after_tools_route(prefix), {
+        f"{prefix}_agent": f"{prefix}_agent",
+        f"{prefix}_respond": f"{prefix}_respond",
+    })
     graph.add_edge(f"{prefix}_respond", END)
 
     return graph.compile()
