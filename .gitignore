@@ -7,8 +7,10 @@ logs/
 
 # Local documents
 YUNPICTURE_INTERVIEW_QA.md
+LANGGRAPH_STUDY_NOTES.md
 md/
 .md/
+docs/
 
 # Java / Maven
 target/
