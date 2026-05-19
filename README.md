@@ -1,8 +1,8 @@
 # LingPicture / 灵图空间
 
-灵图空间是一个面向图片空间管理的智能协同图库系统，后端基于 Spring Boot，AI 能力基于 Python FastAPI 独立服务实现。项目在传统图片上传、空间管理、权限控制、团队协作、图片编辑和空间分析能力之上，引入 LLM、RAG 与多 Agent 工作流，实现图片语义搜索、自动标注、批量标签整理和多轮对话式图片管理。
+灵图空间是一个面向图片空间管理的智能协同图库系统，后端基于 Spring Boot，AI 能力基于 Python FastAPI 独立服务实现。项目在传统图片上传、空间管理、权限控制、团队协作、图片编辑和空间分析能力之上，引入 LLM、RAG、多 Agent 工作流与异步索引队列，实现图片语义搜索、自动标注、批量标签整理和多轮对话式图片管理。
 
-项目的核心设计不是把 AI 做成独立聊天机器人，而是让 AI 服务通过 Java 后端的内部接口参与真实图片管理业务：Java 负责鉴权、空间权限、数据落库和业务一致性，Python AI 服务负责模型调用、RAG 检索、工具编排和上下文管理。
+项目的核心设计不是把 AI 做成独立聊天机器人，而是让 AI 服务通过 Java 后端的内部接口参与真实图片管理业务：Java 负责鉴权、空间权限、数据落库、索引事件投递和业务一致性，Python AI 服务负责模型调用、RAG 检索、工具编排和上下文管理。
 
 ## 项目结构
 
@@ -21,8 +21,10 @@
 - MyBatis-Plus
 - MySQL
 - Redis / Spring Session
+- RabbitMQ / Spring AMQP
 - Sa-Token 权限认证
 - WebSocket / Disruptor
+- Spring Scheduling
 - 腾讯云 COS
 - Knife4j
 
@@ -58,6 +60,7 @@ Java 后端是系统的业务主干，所有真实数据操作都经过 Spring B
 - 协作编辑：基于 WebSocket 的图片编辑协同状态同步。
 - AI 网关：统一代理前端到 Python AI 服务的调用，并补充用户身份和空间权限校验。
 - 内部接口：供 Python AI 服务查询图片详情、执行图片编辑、空间分析、保存 Agent 会话摘要和操作日志。
+- AI 索引同步：基于 outbox 表和 RabbitMQ 将图片更新、普通编辑、批量编辑、自动标注和删除事件异步同步到 AI 检索索引。
 
 AI 相关 Java 入口：
 
@@ -72,7 +75,14 @@ AI 相关 Java 入口：
   - `/picture/get/vo/internal`：AI 服务读取图片详情。
   - `/picture/list/page/vo/internal`：AI 服务按数据库条件检索图片。
   - `/picture/edit/internal`：AI 服务执行受控图片编辑。
-  - 删除图片时会调用 AI 索引清理客户端，避免 ChromaDB / BM25 出现脏索引。
+  - 管理端更新、普通编辑、批量编辑和 AI 内部编辑后会触发图片索引 UPSERT 事件。
+  - 删除图片后会触发图片索引 DELETE 事件，避免 ChromaDB / BM25 召回已删除图片。
+
+- `PictureIndexOutboxService` / `PictureIndexMessageProducer` / `PictureIndexMessageConsumer`
+  - `picture_index_outbox` 表先持久化索引事件，降低业务写库成功但索引消息丢失的风险。
+  - `PictureIndexOutboxPublisher` 定时补发 `PENDING` 事件，每批最多 50 条。
+  - RabbitMQ 使用 `picture.index.exchange`、主队列、30 秒延迟重试队列和死信队列。
+  - 消费失败会更新 `retryCount`、`lastError`、`nextRetryTime`，重试达到 3 次后标记 `FAILED` 并进入 DLQ。
 
 - `SpaceAnalyzeController`
   - `/space/analyze/*/internal`：AI 服务复用真实空间分析能力。
@@ -89,8 +99,9 @@ AI 服务位于 `ai-service/`，通过 FastAPI 对 Java 后端提供内部能力
 - `/api/v1/agent/run/stream`：SSE 流式执行多 Agent 任务。
 - `/api/v1/agent/messages/{session_id}`：读取会话消息。
 - `/api/v1/rag/picture/search`：图片语义搜索。
-- `/api/v1/rag/picture/index`：构建图片索引。
+- `/api/v1/rag/picture/build-index`：构建或更新图片索引。
 - `/api/v1/rag/picture/index/{picture_id}`：删除图片索引。
+- `/api/v1/rag/picture/index/status/{space_id}`：查看空间索引状态。
 - `/api/v1/picture/auto-tag/{picture_id}`：图片自动标注。
 
 ### 多 Agent 工作流
@@ -121,6 +132,8 @@ AI 助手采用 Supervisor + Expert 的多 Agent 结构：
  -> 前端 SSE 展示最终结果
 ```
 
+流式输出只把必要工具进度、任务计划和最终回答展示给用户，过滤 Planner / Expert 内部推理片段；前端会在最终回答、错误或连接结束时清理临时进度消息，避免“正在搜索 / 正在编辑”等状态残留在聊天记录中。
+
 ### RAG 图片语义检索
 
 图片搜索链路不是只查数据库，而是结合语义检索和业务数据库检索：
@@ -141,7 +154,28 @@ Query 改写
 - BM25 用于补充标签、名称、简介中的关键词匹配。
 - Java 数据库检索用于补齐业务字段和精确标签场景。
 - Rerank 用于将更相关的图片提前。
-- 删除图片时会同步清理 AI 索引，降低旧图片被召回的概率。
+- 图片更新、普通编辑、批量编辑、AI 自动标注和删除后，由 Java outbox + RabbitMQ 异步驱动 AI 索引 UPSERT / DELETE，保证业务库和检索索引最终一致。
+
+### 图片索引异步同步
+
+AI 索引同步不再由业务线程直接阻塞调用 Python 服务，而是先记录 outbox 事件再投递 MQ：
+
+```text
+图片更新 / 普通编辑 / 批量编辑 / AI 自动标注 / 删除
+ -> PictureService 生成 UPSERT 或 DELETE outbox 事件
+ -> PictureIndexOutboxPublisher 补发 PENDING 事件
+ -> RabbitMQ DirectExchange 分发消息
+ -> PictureIndexMessageConsumer 调用 AiPictureIndexClient
+ -> ai-service build-index / delete-index 更新 ChromaDB + BM25
+```
+
+这条链路支持：
+
+- UPSERT：将图片名称、简介、分类、标签和 URL 组合成检索描述，写入 AI 索引。
+- DELETE：按 `picture_id` 和 `space_id` 清理 AI 索引。
+- 失败重试：消费失败进入 30 秒延迟重试队列，最多重试 3 次。
+- 死信兜底：超过重试次数后进入 DLQ，并在 outbox 表标记为 `FAILED`，保留最近错误。
+- 定时补偿：启动后会扫描 `PENDING` 且到达 `nextRetryTime` 的事件，避免短暂 MQ / AI 服务故障造成索引事件永久丢失。
 
 ### 上下文管理
 
@@ -167,6 +201,7 @@ AI 服务支持多轮对话和指代场景，例如“刚才第二张”“这�
  -> 结构化生成名称、简介、分类、标签
  -> 标签白名单过滤和数量限制
  -> Java /picture/edit/internal 更新图片信息
+ -> Java outbox + RabbitMQ 异步更新 AI 索引
 ```
 
 标签不是任意生成，而是受项目统一标签体系约束，避免 AI 产生过多不可控标签。
@@ -199,6 +234,13 @@ spring:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/yp_picture?...}
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST:/}
 
 cos:
   client:
@@ -256,6 +298,8 @@ mvn spring-boot:run
 http://localhost:8123/api
 ```
 
+如果要验证 AI 索引异步同步，需要同时启动 MySQL、Redis、RabbitMQ 和 AI 服务；RabbitMQ 默认使用 `localhost:5672`、`guest/guest`。
+
 ### 2. 启动 AI 服务
 
 ```bash
@@ -290,6 +334,13 @@ cd yu-picture-backend
 mvn -q -DskipTests compile
 ```
 
+图片索引队列相关测试：
+
+```bash
+cd yu-picture-backend
+mvn -q -Dtest=AiPictureIndexClientTest,PictureIndexRabbitMqConfigTest,PictureIndexMessageConsumerTest,PictureIndexMessageProducerTest,PictureIndexOutboxServiceImplTest,PictureServiceImplIndexSyncTest test
+```
+
 AI 服务测试：
 
 ```bash
@@ -309,9 +360,10 @@ npm run build-only
 - 将 Java 图片管理业务和 Python AI 服务分层解耦，Java 保持业务数据和权限边界，Python 负责 LLM、RAG 和 Agent 编排。
 - 使用多 Agent 工作流拆分搜索、编辑、分析任务，支持“先找图再编辑再分析空间”等多步骤自然语言操作。
 - 构建图片语义搜索链路，结合 ChromaDB 向量检索、BM25 关键词检索、数据库精确检索和 qwen3-rerank 重排序。
+- 使用 outbox + RabbitMQ 保证图片业务变更和 AI 检索索引最终一致，并提供延迟重试、死信队列和定时补偿机制。
 - 支持多轮对话上下文、工具结果记忆和会话摘要持久化，能够处理“刚才第二张”“这些图片”等指代场景。
 - AI 自动标注接入统一标签体系，通过标签白名单和数量限制降低随机标签污染。
-- 删除图片时同步清理 AI 索引，避免向量库和 BM25 缓存召回已删除图片。
+- 前端 SSE 只展示必要工具进度和最终回答，支持图片缩略图、详情链接和空间分析报告排版。
 - Java 内部接口使用内部 token 和用户上下文校验，AI 服务不能绕过原业务权限直接操作数据。
 
 ## 适用场景
