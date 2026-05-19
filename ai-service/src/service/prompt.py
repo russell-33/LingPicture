@@ -91,7 +91,7 @@ PLAN_PROMPT = """你是一个任务规划器。将用户需求分解为子任务
 - 如果任务只需一个专家一步完成，输出包含 1 个子任务的数组
 - 如果需要多步协作（如"先搜再编辑"、"搜图后分析"），按依赖顺序列出
 - 搜索总是先于编辑（需要先找到图再改）
-- 用户要给某类图片添加或删除标签且没有直接提供图片 ID 时，必须规划为 searcher → editor
+- 用户要给某类图片添加或删除标签时：如果上下文提示中已包含 picture_ids，直接规划为 editor（不需要 searcher）；只有完全没有 picture_ids 时，才规划为 searcher → editor
 - 删除某个明确标签时，searcher 子任务要说明按该标签精确查询全量图片 ID，不要只做语义搜索 topK
 - editor 子任务要明确说明使用上游搜索结果中的 picture_ids，并写清要添加 tags 或删除 remove_tags
 - 输出严格 JSON，不要 Markdown 代码块
