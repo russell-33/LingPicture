@@ -64,7 +64,6 @@ public class PictureIndexMessageConsumer {
             pictureIndexMessageProducer.publishDlq(message);
             return;
         }
-
         log.warn("图片 AI 索引消息消费失败，将延迟重试，eventId={}, pictureId={}, retryCount={}, error={}",
                 message.getEventId(), message.getPictureId(), nextRetryCount, errorMessage);
         pictureIndexOutboxService.markRetry(message.getEventId(), nextRetryCount, errorMessage);

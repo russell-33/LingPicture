@@ -72,6 +72,10 @@ public class PictureIndexOutboxServiceImpl extends ServiceImpl<PictureIndexOutbo
         if (eventId == null) {
             return;
         }
+        if (retryCount >= PictureIndexMqConstant.MAX_RETRY_COUNT) {
+            markFailed(eventId, retryCount, errorMessage);
+            return;
+        }
         PictureIndexOutbox update = new PictureIndexOutbox();
         update.setId(eventId);
         update.setRetryCount(retryCount);
