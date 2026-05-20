@@ -139,8 +139,11 @@ def _fallback_plan(task_text: str) -> list[SubTask]:
 
 def _generate_plan(state: MultiAgentState) -> list[SubTask]:
     """调用 LLM 生成任务 plan。单步输出 1 元素，多步输出 N 元素。"""
+    from src.core.memory import load_messages
+
     client = get_llm_client()
     task_text = state.get("current_task", "")
+    session_id = state.get("session_id", "")
     prompt = PLAN_PROMPT.replace("{user_message}", task_text)
     context_hint = _format_tool_context_hint(task_text, state.get("tool_context", {}))
     if context_hint:
@@ -150,12 +153,25 @@ def _generate_plan(state: MultiAgentState) -> list[SubTask]:
             "如果当前用户需求包含指代，请优先使用上述解析出的 picture_ids。"
         )
 
+    # 加载最近对话历史，让规划 LLM 理解跨轮次指代
+    history_messages = []
+    if session_id:
+        history = load_messages(session_id)
+        for m in history[-12:]:
+            if not isinstance(m, dict):
+                continue
+            role = m.get("role", "")
+            content = str(m.get("content", "")).strip()
+            if role in ("user", "assistant") and content:
+                history_messages.append({"role": role, "content": content})
+
+    msgs = [{"role": "system", "content": prompt}]
+    msgs.extend(history_messages)
+    msgs.append({"role": "user", "content": task_text})
+
     response = client.chat.completions.create(
         model=settings.llm_model,
-        messages=_normalize_messages([
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": task_text},
-        ]),
+        messages=_normalize_messages(msgs),
     )
     content = response.choices[0].message.content or "[]"
 
