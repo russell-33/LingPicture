@@ -342,11 +342,13 @@ def make_execute_tools(tool_names: Set[str],
                 logger.error(f"Tool {name} failed: {e}")
 
             if session_id and use_memory:
-                from src.core.tool_context import SEARCH_TOOLS
+                from src.core.tool_context import SEARCH_TOOLS, summarize_tool_result, append_search_round
                 if name in SEARCH_TOOLS:
                     existing = load_tool_context(session_id)
-                    existing.update(summarize_tool_result(name, str(result)))
-                    save_tool_context(session_id, existing)
+                    summarized = summarize_tool_result(name, str(result))
+                    query = args.get("query_text", "") or args.get("tag", "")
+                    updated = append_search_round(existing, summarized, query)
+                    save_tool_context(session_id, updated)
 
             if session_id and name in persist_tools:
                 from src.service.context_persistence import persist_operation_log

@@ -71,22 +71,42 @@ def _last_search_results(tool_context: dict) -> list[dict]:
     return results if isinstance(results, list) else []
 
 
+def _all_search_results(tool_context: dict) -> list[dict]:
+    from src.core.tool_context import get_all_search_results
+    return get_all_search_results(tool_context or {})
+
+
 
 
 
 def _format_tool_context_hint(task_text: str, tool_context: dict) -> str:
-    results = _last_search_results(tool_context)
-    if not results:
+    latest = _last_search_results(tool_context)
+    all_results = _all_search_results(tool_context)
+    if not all_results:
         return ""
 
-    lines = ["可用于解析指代的上一轮 last_search_results："]
-    for item in results[:20]:
-        rank = item.get("rank", "")
-        picture_id = item.get("id", "")
-        name = item.get("name", "")
-        lines.append(f"- rank={rank}, id={picture_id}, name={name}")
+    lines = []
 
-    picture_ids = resolve_ordinal_references(task_text, results)
+    # 最新一轮结果（用于 "第N张"、"这些图片" 等指代）
+    if latest:
+        lines.append("最近一次搜索结果：")
+        for item in latest[:20]:
+            rank = item.get("rank", "")
+            picture_id = item.get("id", "")
+            name = item.get("name", "")
+            lines.append(f"- rank={rank}, id={picture_id}, name={name}")
+
+    # 更早的搜索结果（用于跨轮次的命名指代，如 "红色赛车"）
+    older = [r for r in all_results if r not in latest]
+    if older:
+        lines.append("更早的搜索结果：")
+        for item in older[:20]:
+            picture_id = item.get("id", "")
+            name = item.get("name", "")
+            lines.append(f"- id={picture_id}, name={name}")
+
+    # 用最新结果解析序号指代
+    picture_ids = resolve_ordinal_references(task_text, latest)
     if picture_ids:
         lines.append(f"根据当前用户指代解析出的 picture_ids：{','.join(picture_ids)}")
     return "\n".join(lines)
