@@ -448,14 +448,17 @@ multi_agent_app = build_multi_agent()
 
 # --- 执行入口 ---
 
-def _save_messages(session_id: str, messages: list, user_id: int = 0, space_id: str = "", task: str = ""):
-    """保存对话历史（去重 + 可选压缩）。"""
-    from src.core.memory import save_messages, save_summary
+def _save_messages(session_id: str, new_messages: list, user_id: int = 0, space_id: str = "", task: str = ""):
+    """保存对话历史（合并旧历史 + 去重 + 可选压缩）。"""
+    from src.core.memory import load_messages, save_messages, save_summary
     from src.core.compact import should_compact, build_compact_prompt
     from src.service.context_persistence import persist_session_summary
 
+    old_messages = [m for m in load_messages(session_id) if m.get("role") != "system"]
+    merged = old_messages + list(new_messages)
+
     cleaned = []
-    for m in messages:
+    for m in merged:
         if cleaned and cleaned[-1].get("content") == m.get("content") and cleaned[-1].get("role") == m.get("role"):
             continue
         cleaned.append(m)
@@ -479,13 +482,11 @@ def _save_messages(session_id: str, messages: list, user_id: int = 0, space_id: 
 
 def run_multi_agent(task: str, session_id: str, space_id: str, max_steps: int = 10, user_id: int = 0) -> dict:
     """同步执行多智能体任务。"""
-    from src.core.session_context import build_agent_messages
     from src.core.memory import load_tool_context
-    history = build_agent_messages(session_id, task, space_id, user_id)
     tool_context = load_tool_context(session_id)
 
     state = {
-        "messages": history,
+        "messages": [],
         "step_count": 0,
         "final_answer": "",
         "space_id": space_id,
@@ -507,14 +508,12 @@ def run_multi_agent(task: str, session_id: str, space_id: str, max_steps: int = 
 
 async def run_multi_agent_stream(task: str, session_id: str, space_id: str, max_steps: int = 10, user_id: int = 0):
     """流式执行多智能体任务。兼容现有 SSE 事件类型。"""
-    from src.core.session_context import build_agent_messages
     from src.core.memory import load_tool_context
 
-    history = build_agent_messages(session_id, task, space_id, user_id)
     tool_context = load_tool_context(session_id)
 
     state = {
-        "messages": history,
+        "messages": [],
         "step_count": 0,
         "final_answer": "",
         "space_id": space_id,
