@@ -32,7 +32,6 @@ class MultiAgentStreamTest(unittest.TestCase):
     def test_stream_does_not_leak_internal_llm_chunks(self):
         async def collect():
             with patch("src.service.multi_agent.multi_agent_app", FakeMultiAgentApp()), \
-                    patch("src.core.session_context.build_agent_messages", return_value=[]), \
                     patch("src.service.multi_agent._save_messages"):
                 return [
                     chunk async for chunk in run_multi_agent_stream(
