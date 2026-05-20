@@ -5,6 +5,7 @@ from typing import Literal, Callable, Set, Optional
 
 from langgraph.graph import StateGraph, END
 from src.core.multi_agent_state import ExpertState
+from src.core.picture_id_utils import extract_picture_ids_from_text
 from src.core.tag_utils import extract_add_tag, extract_remove_tag, normalize_tag
 from src.service.llm import get_llm_client, _normalize_messages
 from src.core.tool import get_tools_list, execute_tool
@@ -74,19 +75,12 @@ def _extract_remove_tag_from_task(task_description: str) -> str:
     return extract_remove_tag(task_description)
 
 
-def _extract_picture_ids_from_task(task_description: str) -> list[str]:
-    marker_match = re.search(r"picture_ids[：:]\s*([0-9,\s]+)", str(task_description or ""))
-    if marker_match:
-        return re.findall(r"\d{8,}", marker_match.group(1))
-    return re.findall(r"\b\d{8,}\b", str(task_description or ""))
-
-
 def _build_direct_edit_tool_call(state: ExpertState, tool_names: Set[str]) -> Optional[dict]:
     if "edit_picture" not in tool_names:
         return None
 
     task_description = state.get("task_description", "")
-    picture_ids = _extract_picture_ids_from_task(task_description)
+    picture_ids = extract_picture_ids_from_text(task_description)
     if not picture_ids:
         return None
 
@@ -348,9 +342,11 @@ def make_execute_tools(tool_names: Set[str],
                 logger.error(f"Tool {name} failed: {e}")
 
             if session_id and use_memory:
-                existing = load_tool_context(session_id)
-                existing.update(summarize_tool_result(name, str(result)))
-                save_tool_context(session_id, existing)
+                from src.core.tool_context import SEARCH_TOOLS
+                if name in SEARCH_TOOLS:
+                    existing = load_tool_context(session_id)
+                    existing.update(summarize_tool_result(name, str(result)))
+                    save_tool_context(session_id, existing)
 
             if session_id and name in persist_tools:
                 from src.service.context_persistence import persist_operation_log

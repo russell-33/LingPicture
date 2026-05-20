@@ -8,6 +8,7 @@ from langgraph.graph import StateGraph, END
 from src.service.llm import get_llm_client, _normalize_messages
 from src.service.prompt import PLAN_PROMPT
 from src.core.multi_agent_state import MultiAgentState, SubTask
+from src.core.picture_id_utils import extract_picture_ids_from_text, resolve_ordinal_references
 from src.core.tag_utils import extract_add_tag, extract_remove_tag
 from src.service.expert_searcher import build_searcher_agent
 from src.service.expert_editor import build_editor_agent
@@ -20,18 +21,6 @@ MAX_SUPERVISOR_ROUNDS = 10
 MAX_EXPERT_RESULT_CHARS = 12000
 ANSWER_STREAM_CHUNK_SIZE = 36
 ANSWER_STREAM_DELAY_SECONDS = 0.01
-ORDINAL_MAP = {
-    "一": 1,
-    "二": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
-    "六": 6,
-    "七": 7,
-    "八": 8,
-    "九": 9,
-    "十": 10,
-}
 
 # 单例子图
 searcher_app = build_searcher_agent()
@@ -76,56 +65,13 @@ def _normalize_plan_description(description: str, agent: str, task_text: str) ->
     return description
 
 
-def _parse_ordinal(token: str) -> int:
-    text = str(token or "").strip()
-    if text.isdigit():
-        return int(text)
-    if text in ORDINAL_MAP:
-        return ORDINAL_MAP[text]
-    if text.startswith("十") and len(text) == 2 and text[1] in ORDINAL_MAP:
-        return 10 + ORDINAL_MAP[text[1]]
-    if text.endswith("十") and len(text) == 2 and text[0] in ORDINAL_MAP:
-        return ORDINAL_MAP[text[0]] * 10
-    if "十" in text:
-        left, right = text.split("十", 1)
-        tens = ORDINAL_MAP.get(left, 1) if left else 1
-        ones = ORDINAL_MAP.get(right, 0) if right else 0
-        return tens * 10 + ones
-    return 0
-
 
 def _last_search_results(tool_context: dict) -> list[dict]:
     results = (tool_context or {}).get("last_search_results", [])
     return results if isinstance(results, list) else []
 
 
-def _resolve_referenced_picture_ids(text: str, tool_context: dict) -> list[str]:
-    results = _last_search_results(tool_context)
-    if not results:
-        return []
 
-    content = str(text or "")
-    ids = []
-    seen = set()
-    for ordinal in re.findall(r"第\s*([一二三四五六七八九十\d]+)\s*张", content):
-        index = _parse_ordinal(ordinal)
-        if index <= 0 or index > len(results):
-            continue
-        picture_id = str(results[index - 1].get("id") or "")
-        if picture_id and picture_id not in seen:
-            seen.add(picture_id)
-            ids.append(picture_id)
-
-    if ids:
-        return ids
-
-    if re.search(r"(这几张|这些图片|这些图|上述图片|上述图|上面这些|刚才这些|刚才的图片|搜索结果|全部图片|所有图片)", content):
-        for item in results:
-            picture_id = str(item.get("id") or "")
-            if picture_id and picture_id not in seen:
-                seen.add(picture_id)
-                ids.append(picture_id)
-    return ids
 
 
 def _format_tool_context_hint(task_text: str, tool_context: dict) -> str:
@@ -140,7 +86,7 @@ def _format_tool_context_hint(task_text: str, tool_context: dict) -> str:
         name = item.get("name", "")
         lines.append(f"- rank={rank}, id={picture_id}, name={name}")
 
-    picture_ids = _resolve_referenced_picture_ids(task_text, tool_context)
+    picture_ids = resolve_ordinal_references(task_text, results)
     if picture_ids:
         lines.append(f"根据当前用户指代解析出的 picture_ids：{','.join(picture_ids)}")
     return "\n".join(lines)
@@ -250,23 +196,6 @@ def _clip_expert_result(result: str) -> str:
     return clipped.rstrip() + "\n...（专家结果过长，已省略后续内容）"
 
 
-def _extract_picture_ids(text: str) -> list[str]:
-    """从上游搜索结果中提取图片 ID，保序去重。"""
-    patterns = [
-        r"/picture/(\d+)",
-        r'"id"\s*:\s*"?(\d+)"?',
-        r'"picture_id"\s*:\s*"?(\d+)"?',
-        r"ID[:：]\s*(\d+)",
-    ]
-    ids = []
-    seen = set()
-    for pattern in patterns:
-        for match in re.findall(pattern, text):
-            if match in seen:
-                continue
-            seen.add(match)
-            ids.append(match)
-    return ids
 
 
 def _split_answer_for_stream(answer: str) -> list[str]:
@@ -319,7 +248,7 @@ def _build_expert_task_description(plan: list[SubTask], current_id: str,
         lines.append(f"[{task.get('agent')}] {task.get('description')}：")
         lines.append(result)
 
-    picture_ids = _extract_picture_ids("\n".join(combined_results))
+    picture_ids = extract_picture_ids_from_text("\n".join(combined_results))
     if picture_ids:
         lines.extend([
             "",

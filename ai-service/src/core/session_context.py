@@ -1,5 +1,5 @@
 from src.core.context import slide_window
-from src.core.memory import load_messages, load_summary, save_summary, load_tool_context
+from src.core.memory import load_messages, load_summary, save_summary
 from src.service.context_persistence import load_durable_session_summary
 from src.service.prompt import AGENT_SYSTEM_PROMPT
 
@@ -20,10 +20,6 @@ def build_agent_messages(session_id: str, task: str, space_id: str, user_id: int
             save_summary(session_id, summary)
     if summary:
         context_messages.append({"role": "system", "content": f"历史摘要：{summary}"})
-
-    tool_context = load_tool_context(session_id)
-    if tool_context:
-        context_messages.append({"role": "system", "content": f"可指代的上一轮工具结果：{tool_context}"})
 
     history = [m for m in load_messages(session_id) if m.get("role") != "system"]
     history.extend(context_messages)

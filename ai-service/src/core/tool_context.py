@@ -1,12 +1,12 @@
 import json
 
 
-SEARCH_TOOL = "search_pictures_by_semantic"
+SEARCH_TOOLS = {"search_pictures_by_semantic", "search_pictures_by_tag"}
 
 
 def summarize_tool_result(tool_name: str, result: str) -> dict:
-    if tool_name != SEARCH_TOOL:
-        return {tool_name: str(result)[:1000]}
+    if tool_name not in SEARCH_TOOLS:
+        return {}
 
     try:
         items = json.loads(result)
