@@ -78,16 +78,3 @@ def load_summary(session_id: str) -> str:
     return str(data.get("summary", "")) if data else ""
 
 
-def save_tool_context(session_id: str, context: dict) -> None:
-    """Persist structured tool-call context (e.g. search results)."""
-    _save_json(_make_key(session_id, "tool_context"), context, SESSION_TTL)
-
-
-def load_tool_context(session_id: str) -> dict:
-    """Load previously persisted tool-call context."""
-    return _load_json(_make_key(session_id, "tool_context")) or {}
-
-
-def clear_tool_context(session_id: str) -> None:
-    """Remove persisted tool-call context for a session."""
-    _delete_key(_make_key(session_id, "tool_context"))

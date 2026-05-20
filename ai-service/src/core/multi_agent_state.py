@@ -14,7 +14,6 @@ class MultiAgentState(TypedDict):
     messages: Annotated[list[dict], operator.add]
     session_id: str
     current_task: str
-    tool_context: dict
     space_id: str
     user_id: int
     step_count: int

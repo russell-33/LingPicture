@@ -2,13 +2,13 @@ import asyncio
 import json
 import logging
 import re
-from typing import Literal, Optional
+from typing import Literal
 
 from langgraph.graph import StateGraph, END
 from src.service.llm import get_llm_client, _normalize_messages
 from src.service.prompt import PLAN_PROMPT
 from src.core.multi_agent_state import MultiAgentState, SubTask
-from src.core.picture_id_utils import extract_picture_ids_from_text, resolve_ordinal_references
+from src.core.picture_id_utils import extract_picture_ids_from_text
 from src.core.tag_utils import extract_add_tag, extract_remove_tag
 from src.service.expert_searcher import build_searcher_agent
 from src.service.expert_editor import build_editor_agent
@@ -66,50 +66,6 @@ def _normalize_plan_description(description: str, agent: str, task_text: str) ->
 
 
 
-def _last_search_results(tool_context: dict) -> list[dict]:
-    results = (tool_context or {}).get("last_search_results", [])
-    return results if isinstance(results, list) else []
-
-
-def _all_search_results(tool_context: dict) -> list[dict]:
-    from src.core.tool_context import get_all_search_results
-    return get_all_search_results(tool_context or {})
-
-
-
-
-
-def _format_tool_context_hint(task_text: str, tool_context: dict) -> str:
-    latest = _last_search_results(tool_context)
-    all_results = _all_search_results(tool_context)
-    if not all_results:
-        return ""
-
-    lines = []
-
-    # 最新一轮结果（用于 "第N张"、"这些图片" 等指代）
-    if latest:
-        lines.append("最近一次搜索结果：")
-        for item in latest[:20]:
-            rank = item.get("rank", "")
-            picture_id = item.get("id", "")
-            name = item.get("name", "")
-            lines.append(f"- rank={rank}, id={picture_id}, name={name}")
-
-    # 更早的搜索结果（用于跨轮次的命名指代，如 "红色赛车"）
-    older = [r for r in all_results if r not in latest]
-    if older:
-        lines.append("更早的搜索结果：")
-        for item in older[:20]:
-            picture_id = item.get("id", "")
-            name = item.get("name", "")
-            lines.append(f"- id={picture_id}, name={name}")
-
-    # 用最新结果解析序号指代
-    picture_ids = resolve_ordinal_references(task_text, latest)
-    if picture_ids:
-        lines.append(f"根据当前用户指代解析出的 picture_ids：{','.join(picture_ids)}")
-    return "\n".join(lines)
 
 
 def _items_to_plan(plan_data: list, task_text: str) -> list[SubTask]:
@@ -165,13 +121,6 @@ def _generate_plan(state: MultiAgentState) -> list[SubTask]:
     task_text = state.get("current_task", "")
     session_id = state.get("session_id", "")
     prompt = PLAN_PROMPT.replace("{user_message}", task_text)
-    context_hint = _format_tool_context_hint(task_text, state.get("tool_context", {}))
-    if context_hint:
-        prompt += (
-            "\n\n"
-            f"{context_hint}\n"
-            "如果当前用户需求包含指代，请优先使用上述解析出的 picture_ids。"
-        )
 
     # 加载最近对话历史，让规划 LLM 理解跨轮次指代
     history_messages = []
@@ -257,9 +206,7 @@ async def _yield_answer_stream(answer: str):
         await asyncio.sleep(ANSWER_STREAM_DELAY_SECONDS)
 
 
-def _build_expert_task_description(plan: list[SubTask], current_id: str,
-                                   tool_context: Optional[dict] = None,
-                                   original_task: str = "") -> str:
+def _build_expert_task_description(plan: list[SubTask], current_id: str) -> str:
     """把当前任务和已完成的上游结果一起交给专家，保证搜后编辑能拿到 ID。"""
     current_task = ""
     prior_results = []
@@ -271,9 +218,6 @@ def _build_expert_task_description(plan: list[SubTask], current_id: str,
             prior_results.append(task)
 
     if not prior_results:
-        context_hint = _format_tool_context_hint(f"{original_task}\n{current_task}", tool_context or {})
-        if context_hint:
-            return "\n".join([current_task, "", context_hint])
         return current_task
 
     lines = [f"当前子任务：{current_task}", "", "上游已完成任务结果："]
@@ -289,12 +233,8 @@ def _build_expert_task_description(plan: list[SubTask], current_id: str,
         lines.extend([
             "",
             f"从上游结果中提取到的 picture_ids：{','.join(picture_ids)}",
-            "如果当前任务要处理“上述图片/这些图片/全部结果”，请直接使用这些 picture_ids。",
+            '如果当前任务要处理"上述图片/这些图片/全部结果"，请直接使用这些 picture_ids。',
         ])
-
-    context_hint = _format_tool_context_hint(f"{original_task}\n{current_task}", tool_context or {})
-    if context_hint:
-        lines.extend(["", context_hint])
 
     return "\n".join(lines)
 
@@ -354,17 +294,9 @@ def supervisor_node(state: MultiAgentState) -> dict:
 
 def _run_expert(expert_app, state: MultiAgentState, max_steps: int = 6) -> dict:
     """通用专家执行：运行专家子图，只将最终摘要返回给主图。"""
-    from src.core.memory import load_tool_context
     plan = state.get("plan", [])
     current_id = state.get("current_subtask", "")
-    # 重新加载最新的 tool_context，确保后续专家能看到前面专家保存的工具结果
-    fresh_tool_context = load_tool_context(state.get("session_id", ""))
-    task_desc = _build_expert_task_description(
-        plan,
-        current_id,
-        fresh_tool_context,
-        state.get("current_task", ""),
-    )
+    task_desc = _build_expert_task_description(plan, current_id)
 
     expert_state = {
         "messages": [],
@@ -518,9 +450,6 @@ def _save_messages(session_id: str, new_messages: list, user_id: int = 0, space_
 
 def run_multi_agent(task: str, session_id: str, space_id: str, max_steps: int = 10, user_id: int = 0) -> dict:
     """同步执行多智能体任务。"""
-    from src.core.memory import load_tool_context
-    tool_context = load_tool_context(session_id)
-
     state = {
         "messages": [],
         "step_count": 0,
@@ -530,7 +459,6 @@ def run_multi_agent(task: str, session_id: str, space_id: str, max_steps: int = 
         "max_steps": max_steps,
         "session_id": session_id,
         "current_task": task,
-        "tool_context": tool_context,
         "plan": [],
         "current_subtask": "",
         "next_agent": "",
@@ -544,10 +472,6 @@ def run_multi_agent(task: str, session_id: str, space_id: str, max_steps: int = 
 
 async def run_multi_agent_stream(task: str, session_id: str, space_id: str, max_steps: int = 10, user_id: int = 0):
     """流式执行多智能体任务。兼容现有 SSE 事件类型。"""
-    from src.core.memory import load_tool_context
-
-    tool_context = load_tool_context(session_id)
-
     state = {
         "messages": [],
         "step_count": 0,
@@ -557,7 +481,6 @@ async def run_multi_agent_stream(task: str, session_id: str, space_id: str, max_
         "max_steps": max_steps,
         "session_id": session_id,
         "current_task": task,
-        "tool_context": tool_context,
         "plan": [],
         "current_subtask": "",
         "next_agent": "",

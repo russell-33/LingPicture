@@ -69,11 +69,6 @@ class MultiAgentPlanParsingTest(unittest.TestCase):
     def test_generate_plan_preserves_add_tag_value_for_editor(self):
         state = {
             "current_task": "给这几张图片打上赛车标签",
-            "tool_context": {
-                "last_search_results": [
-                    {"rank": 1, "id": 2056647696043470849, "name": "赛车停赛场"},
-                ],
-            },
         }
 
         with patch("src.service.multi_agent.get_llm_client", return_value=AddTagPlanClient()):

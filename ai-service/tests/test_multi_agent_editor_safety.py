@@ -48,7 +48,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"edit_picture"},
             inject_user_id_tools={"edit_picture"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -85,7 +84,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"edit_picture"},
             inject_user_id_tools={"edit_picture"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -122,7 +120,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"search_pictures_by_semantic", "search_pictures_by_tag"},
             inject_user_id_tools={"search_pictures_by_tag"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -156,7 +153,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"search_pictures_by_tag"},
             inject_user_id_tools={"search_pictures_by_tag"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -188,7 +184,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"search_pictures_by_semantic"},
             inject_user_id_tools={"search_pictures_by_semantic"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -222,7 +217,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"edit_picture"},
             inject_user_id_tools={"edit_picture"},
-            use_memory=False,
         )
         state = {
             "messages": [{
@@ -260,7 +254,6 @@ class MultiAgentEditorSafetyTest(unittest.TestCase):
         execute_tools = make_execute_tools(
             {"edit_picture"},
             inject_user_id_tools={"edit_picture"},
-            use_memory=False,
         )
         state = {
             "messages": [{

@@ -301,15 +301,13 @@ def make_after_tools_route(node_prefix: str):
 
 def make_execute_tools(tool_names: Set[str],
                        inject_user_id_tools: Optional[Set[str]] = None,
-                       persist_tools: Optional[Set[str]] = None,
-                       use_memory: bool = True):
+                       persist_tools: Optional[Set[str]] = None):
     """创建专家工具执行节点。
 
     Args:
         tool_names: 该专家拥有的工具名集合
         inject_user_id_tools: 需要注入 user_id 的工具集合
         persist_tools: 需要记录操作日志的工具集合
-        use_memory: 是否使用 tool_context 记忆
     """
     if inject_user_id_tools is None:
         inject_user_id_tools = set()
@@ -317,9 +315,6 @@ def make_execute_tools(tool_names: Set[str],
         persist_tools = set()
 
     def execute_tools(state: ExpertState) -> dict:
-        from src.core.memory import load_tool_context, save_tool_context
-        from src.core.tool_context import summarize_tool_result
-
         last_msg = state["messages"][-1]
         tool_calls = last_msg.get("tool_calls", [])
         tool_results = []
@@ -340,15 +335,6 @@ def make_execute_tools(tool_names: Set[str],
             except Exception as e:
                 result = f"Tool execution error: {str(e)}"
                 logger.error(f"Tool {name} failed: {e}")
-
-            if session_id and use_memory:
-                from src.core.tool_context import SEARCH_TOOLS, summarize_tool_result, append_search_round
-                if name in SEARCH_TOOLS:
-                    existing = load_tool_context(session_id)
-                    summarized = summarize_tool_result(name, str(result))
-                    query = args.get("query_text", "") or args.get("tag", "")
-                    updated = append_search_round(existing, summarized, query)
-                    save_tool_context(session_id, updated)
 
             if session_id and name in persist_tools:
                 from src.service.context_persistence import persist_operation_log
