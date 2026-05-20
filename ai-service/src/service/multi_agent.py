@@ -115,12 +115,18 @@ def _fallback_plan(task_text: str) -> list[SubTask]:
 
 def _generate_plan(state: MultiAgentState) -> list[SubTask]:
     """调用 LLM 生成任务 plan。单步输出 1 元素，多步输出 N 元素。"""
-    from src.core.memory import load_messages
+    from src.core.memory import load_messages, load_summary
 
     client = get_llm_client()
     task_text = state.get("current_task", "")
     session_id = state.get("session_id", "")
     prompt = PLAN_PROMPT.replace("{user_message}", task_text)
+
+    # 加载对话摘要（压缩后的更早上下文）
+    if session_id:
+        summary = load_summary(session_id)
+        if summary:
+            prompt += f"\n\n历史摘要：\n{summary}"
 
     # 加载最近对话历史，让规划 LLM 理解跨轮次指代
     history_messages = []
