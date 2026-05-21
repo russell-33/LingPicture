@@ -167,7 +167,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         Long finalSpaceId = spaceId;
         Long finalPicId = picId;
         Picture finalOldPic = oldPicture;
-        transactionTemplate.execute(status -> {
+        PictureIndexOutbox event = transactionTemplate.execute(status -> {
             boolean result = this.saveOrUpdate(picture);
             throwIf(!result, ErrorCode.OPERATION_ERROR, "上传图片失败，数据库操作失败");
             if (finalSpaceId != null && finalPicId == null) {
@@ -182,8 +182,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                         .setSql("totalSize = totalSize + " + (picture.getPicSize() - finalOldPic.getPicSize())).update();
                 throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
             }
-            return true;
+            Picture savedPicture = this.getById(picture.getId());
+            throwIf(savedPicture == null, ErrorCode.OPERATION_ERROR, "图片保存后查询失败");
+            return pictureIndexOutboxService.createUpsertEvent(savedPicture);
         });
+        publishOutboxEvent(event);
         return PictureVO.objToVo(picture);
     }
 
@@ -451,7 +454,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         //this.checkPictureAuth(picture, loginUser);
         //更新空间容量
         Long finalSpaceId = picture.getSpaceId();
-        transactionTemplate.execute(status -> {
+        PictureIndexOutbox event = transactionTemplate.execute(status -> {
             //删除数据库中的数据
             boolean deleteResult = this.removeById(picture.getId());
             ThrowUtils.throwIf(!deleteResult, ErrorCode.OPERATION_ERROR, "数据异常，删除图片失败");
@@ -462,10 +465,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                         .setSql("totalSize = totalSize - " + picture.getPicSize()).update();
                 throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
             }
-            return true;
+            return pictureIndexOutboxService.createDeleteEvent(picture.getId(), finalSpaceId);
         });
-        PictureIndexOutbox event = pictureIndexOutboxService.createDeleteEvent(picture.getId(), finalSpaceId);
-        pictureIndexMessageProducer.publishOutboxEvent(event);
+        publishOutboxEvent(event);
         //删除cos中的文件
         this.clearPictureFile(picture);
     }
@@ -489,10 +491,57 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         this.validPicture(picture);
         // 设置编辑时间
         picture.setEditTime(new Date());
-        // 操作数据库
-        boolean result = this.updateById(picture);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        syncPictureIndex(this.getById(id));
+        PictureIndexOutbox event = transactionTemplate.execute(status -> {
+            boolean result = this.updateById(picture);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+            Picture updatedPicture = this.getById(id);
+            ThrowUtils.throwIf(updatedPicture == null, ErrorCode.NOT_FOUND_ERROR);
+            return pictureIndexOutboxService.createUpsertEvent(updatedPicture);
+        });
+        publishOutboxEvent(event);
+    }
+
+    @Override
+    public void updatePicture(PictureUpdateRequest pictureUpdateRequest, User loginUser) {
+        long id = pictureUpdateRequest.getId();
+        Picture oldPicture = this.getById(id);
+        throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+
+        Picture picture = new Picture();
+        BeanUtils.copyProperties(pictureUpdateRequest, picture);
+        this.fillReviewParams(picture, loginUser);
+        picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
+        this.validPicture(picture);
+
+        PictureIndexOutbox event = transactionTemplate.execute(status -> {
+            boolean result = this.updateById(picture);
+            throwIf(!result, ErrorCode.OPERATION_ERROR);
+            Picture updatedPicture = this.getById(id);
+            throwIf(updatedPicture == null, ErrorCode.NOT_FOUND_ERROR);
+            return pictureIndexOutboxService.createUpsertEvent(updatedPicture);
+        });
+        publishOutboxEvent(event);
+    }
+
+    @Override
+    public void editPictureInternal(PictureEditRequest pictureEditRequest) {
+        long id = pictureEditRequest.getId();
+        Picture oldPicture = this.getById(id);
+        throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+
+        Picture picture = new Picture();
+        BeanUtils.copyProperties(pictureEditRequest, picture);
+        picture.setTags(JSONUtil.toJsonStr(pictureEditRequest.getTags()));
+        picture.setEditTime(new Date());
+
+        PictureIndexOutbox event = transactionTemplate.execute(status -> {
+            boolean result = this.updateById(picture);
+            throwIf(!result, ErrorCode.OPERATION_ERROR);
+            Picture updatedPicture = this.getById(id);
+            throwIf(updatedPicture == null, ErrorCode.NOT_FOUND_ERROR);
+            return pictureIndexOutboxService.createUpsertEvent(updatedPicture);
+        });
+        publishOutboxEvent(event);
     }
 
     @Override
@@ -566,11 +615,20 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             fillPictureWithNameRule(oldPictures, nameRule);
         }
 
-        //操作数据库
-        boolean result = this.updateBatchById(oldPictures);
-        throwIf(!result, ErrorCode.OPERATION_ERROR, "批量编辑失败");
-        this.listByIds(oldPictures.stream().map(Picture::getId).collect(Collectors.toList()))
-                .forEach(this::syncPictureIndex);
+        List<Long> updatedPictureIds = oldPictures.stream().map(Picture::getId).collect(Collectors.toList());
+        List<PictureIndexOutbox> events = transactionTemplate.execute(status -> {
+            boolean result = this.updateBatchById(oldPictures);
+            throwIf(!result, ErrorCode.OPERATION_ERROR, "批量编辑失败");
+            List<Picture> updatedPictures = this.listByIds(updatedPictureIds);
+            if (CollUtil.isEmpty(updatedPictures)) {
+                return Collections.emptyList();
+            }
+            return updatedPictures.stream()
+                    .map(pictureIndexOutboxService::createUpsertEvent)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        });
+        publishOutboxEvents(events);
     }
 
     @Override
@@ -579,7 +637,18 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             return;
         }
         PictureIndexOutbox event = pictureIndexOutboxService.createUpsertEvent(picture);
+        publishOutboxEvent(event);
+    }
+
+    private void publishOutboxEvent(PictureIndexOutbox event) {
         pictureIndexMessageProducer.publishOutboxEvent(event);
+    }
+
+    private void publishOutboxEvents(List<PictureIndexOutbox> events) {
+        if (CollUtil.isEmpty(events)) {
+            return;
+        }
+        events.forEach(this::publishOutboxEvent);
     }
 
     @Override
@@ -619,4 +688,3 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
     }
 }
-

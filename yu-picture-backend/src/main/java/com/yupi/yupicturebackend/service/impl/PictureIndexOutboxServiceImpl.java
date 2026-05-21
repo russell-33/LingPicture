@@ -5,6 +5,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupicturebackend.constant.PictureIndexMqConstant;
+import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.mapper.PictureIndexOutboxMapper;
 import com.yupi.yupicturebackend.model.dto.picture.PictureIndexMessage;
 import com.yupi.yupicturebackend.model.entity.Picture;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+
+import static com.yupi.yupicturebackend.exception.ThrowUtils.throwIf;
 
 /**
  * 图片 AI 索引 outbox 服务实现。
@@ -115,7 +118,8 @@ public class PictureIndexOutboxServiceImpl extends ServiceImpl<PictureIndexOutbo
         event.setPayload(JSONUtil.toJsonStr(message));
         event.setCreateTime(new Date());
         event.setUpdateTime(new Date());
-        this.save(event);
+        boolean result = this.save(event);
+        throwIf(!result, ErrorCode.OPERATION_ERROR, "创建图片索引事件失败");
         return event;
     }
 

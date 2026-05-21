@@ -118,6 +118,21 @@ public interface PictureService extends IService<Picture> {
     void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 
     /**
+     * 更新图片（管理员）
+     *
+     * @param pictureUpdateRequest
+     * @param loginUser
+     */
+    void updatePicture(PictureUpdateRequest pictureUpdateRequest, User loginUser);
+
+    /**
+     * 编辑图片（内部调用）
+     *
+     * @param pictureEditRequest
+     */
+    void editPictureInternal(PictureEditRequest pictureEditRequest);
+
+    /**
      * 根据颜色查询图片
      *
      * @param spaceId

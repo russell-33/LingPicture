@@ -35,8 +35,6 @@ import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.service.SpaceService;
 import com.yupi.yupicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
@@ -45,7 +43,6 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.time.Duration;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -133,23 +130,8 @@ public class PictureController {
         if (pictureUpdateRequest == null || pictureUpdateRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        // 判断是否存在
-        long id = pictureUpdateRequest.getId();
-        Picture oldPicture = pictureService.getById(id);
-        throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 将实体类和 DTO 进行转换
-        Picture picture = new Picture();
-        BeanUtils.copyProperties(pictureUpdateRequest, picture);
-        //补充审核参数
-        pictureService.fillReviewParams(picture, userService.getLoginUser(request));
-        // 注意将 list 转为 string
-        picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
-        // 数据校验
-        pictureService.validPicture(picture);
-        // 操作数据库
-        boolean result = pictureService.updateById(picture);
-        throwIf(!result, ErrorCode.OPERATION_ERROR);
-        pictureService.syncPictureIndex(pictureService.getById(id));
+        User loginUser = userService.getLoginUser(request);
+        pictureService.updatePicture(pictureUpdateRequest, loginUser);
         return ResultUtils.success(true);
     }
 
@@ -353,13 +335,7 @@ public class PictureController {
         throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         validateInternalPictureScope(oldPicture, pictureEditRequest.getSpaceId());
         validateInternalPicturePermission(oldPicture, request, SpaceUserPermissionConstant.PICTURE_EDIT);
-        Picture picture = new Picture();
-        BeanUtils.copyProperties(pictureEditRequest, picture);
-        picture.setTags(JSONUtil.toJsonStr(pictureEditRequest.getTags()));
-        picture.setEditTime(new Date());
-        boolean result = pictureService.updateById(picture);
-        throwIf(!result, ErrorCode.OPERATION_ERROR);
-        pictureService.syncPictureIndex(pictureService.getById(id));
+        pictureService.editPictureInternal(pictureEditRequest);
         return ResultUtils.success(true);
     }
 
