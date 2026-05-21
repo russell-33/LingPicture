@@ -526,9 +526,18 @@ async def run_multi_agent_stream(task: str, session_id: str, space_id: str, max_
         if not final_answer:
             final_answer = "抱歉，处理过程中出现了问题，请稍后重试。"
 
-        # 保存对话历史
-        _save_messages(session_id, state["messages"] + [{"role": "assistant", "content": final_answer}],
-                       user_id, space_id, task)
+        # 保存本轮可见对话。astream_events 不会原地更新初始 state，
+        # 这里需要显式记录用户消息，否则重启后只能恢复 assistant 回复。
+        _save_messages(
+            session_id,
+            [
+                {"role": "user", "content": task},
+                {"role": "assistant", "content": final_answer},
+            ],
+            user_id,
+            space_id,
+            task,
+        )
         async for chunk in _yield_answer_stream(final_answer):
             yield chunk
         yield f"data: {json.dumps({'type': 'final', 'answer': final_answer, 'steps': final_steps})}\n\n"

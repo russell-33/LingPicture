@@ -54,6 +54,29 @@ class MultiAgentStreamTest(unittest.TestCase):
         self.assertEqual({"type": "reasoning", "content": "空间分析完成：共有 10 张图片。"}, payloads[0])
         self.assertEqual({"type": "final", "answer": "空间分析完成：共有 10 张图片。", "steps": 2}, payloads[-1])
 
+    def test_stream_persists_user_and_assistant_messages(self):
+        async def collect():
+            with patch("src.service.multi_agent.multi_agent_app", FakeMultiAgentApp()), \
+                    patch("src.service.multi_agent._save_messages") as save_messages:
+                chunks = [
+                    chunk async for chunk in run_multi_agent_stream(
+                        "分析当前空间",
+                        "session-1",
+                        "2019703681948540929",
+                        6,
+                        7,
+                    )
+                ]
+                return chunks, save_messages
+
+        _, save_messages = asyncio.run(collect())
+
+        saved_messages = save_messages.call_args.args[1]
+        self.assertEqual("user", saved_messages[0]["role"])
+        self.assertEqual("分析当前空间", saved_messages[0]["content"])
+        self.assertEqual("assistant", saved_messages[1]["role"])
+        self.assertEqual("空间分析完成：共有 10 张图片。", saved_messages[1]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()
