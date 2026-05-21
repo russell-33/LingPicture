@@ -60,7 +60,7 @@ Java 后端是系统的业务主干，所有真实数据操作都经过 Spring B
 - 协作编辑：基于 WebSocket 的图片编辑协同状态同步。
 - AI 网关：统一代理前端到 Python AI 服务的调用，并补充用户身份和空间权限校验。
 - 内部接口：供 Python AI 服务查询图片详情、执行图片编辑、空间分析、保存 Agent 会话摘要和操作日志。
-- AI 索引同步：基于 outbox 表和 RabbitMQ 将图片更新、普通编辑、批量编辑、自动标注和删除事件异步同步到 AI 检索索引。
+- AI 索引同步：基于 outbox 表和 RabbitMQ 将图片上传/替换、管理端更新、普通编辑、批量编辑、自动标注和删除事件异步同步到 AI 检索索引。
 
 AI 相关 Java 入口：
 
@@ -75,11 +75,12 @@ AI 相关 Java 入口：
   - `/picture/get/vo/internal`：AI 服务读取图片详情。
   - `/picture/list/page/vo/internal`：AI 服务按数据库条件检索图片。
   - `/picture/edit/internal`：AI 服务执行受控图片编辑。
-  - 管理端更新、普通编辑、批量编辑和 AI 内部编辑后会触发图片索引 UPSERT 事件。
+  - 图片上传/重新上传、管理端更新、普通编辑、批量编辑和 AI 内部编辑后会触发图片索引 UPSERT 事件。
   - 删除图片后会触发图片索引 DELETE 事件，避免 ChromaDB / BM25 召回已删除图片。
 
 - `PictureIndexOutboxService` / `PictureIndexMessageProducer` / `PictureIndexMessageConsumer`
   - `picture_index_outbox` 表先持久化索引事件，降低业务写库成功但索引消息丢失的风险。
+  - 图片业务写操作和 outbox 事件写入处于同一个数据库事务；MQ 发布在事务提交后执行，发布失败仍可由 outbox 补偿。
   - `PictureIndexOutboxPublisher` 定时补发 `PENDING` 事件，每批最多 50 条。
   - RabbitMQ 使用 `picture.index.exchange`、主队列、30 秒延迟重试队列和死信队列。
   - 消费失败会更新 `retryCount`、`lastError`、`nextRetryTime`，重试达到 3 次后标记 `FAILED` 并进入 DLQ。
@@ -154,15 +155,16 @@ Query 改写
 - BM25 用于补充标签、名称、简介中的关键词匹配。
 - Java 数据库检索用于补齐业务字段和精确标签场景。
 - Rerank 用于将更相关的图片提前。
-- 图片更新、普通编辑、批量编辑、AI 自动标注和删除后，由 Java outbox + RabbitMQ 异步驱动 AI 索引 UPSERT / DELETE，保证业务库和检索索引最终一致。
+- 图片上传/替换、管理端更新、普通编辑、批量编辑、AI 自动标注和删除后，由 Java outbox + RabbitMQ 异步驱动 AI 索引 UPSERT / DELETE，保证业务库和检索索引最终一致。
 
 ### 图片索引异步同步
 
 AI 索引同步不再由业务线程直接阻塞调用 Python 服务，而是先记录 outbox 事件再投递 MQ：
 
 ```text
-图片更新 / 普通编辑 / 批量编辑 / AI 自动标注 / 删除
- -> PictureService 生成 UPSERT 或 DELETE outbox 事件
+图片上传或替换 / 管理端更新 / 普通编辑 / 批量编辑 / AI 自动标注 / 删除
+ -> PictureService 在业务事务内生成 UPSERT 或 DELETE outbox 事件
+ -> 事务提交后发布 RabbitMQ 消息，发布失败保留 outbox 补偿状态
  -> PictureIndexOutboxPublisher 补发 PENDING 事件
  -> RabbitMQ DirectExchange 分发消息
  -> PictureIndexMessageConsumer 调用 AiPictureIndexClient
@@ -360,7 +362,7 @@ npm run build-only
 - 将 Java 图片管理业务和 Python AI 服务分层解耦，Java 保持业务数据和权限边界，Python 负责 LLM、RAG 和 Agent 编排。
 - 使用多 Agent 工作流拆分搜索、编辑、分析任务，支持“先找图再编辑再分析空间”等多步骤自然语言操作。
 - 构建图片语义搜索链路，结合 ChromaDB 向量检索、BM25 关键词检索、数据库精确检索和 qwen3-rerank 重排序。
-- 使用 outbox + RabbitMQ 保证图片业务变更和 AI 检索索引最终一致，并提供延迟重试、死信队列和定时补偿机制。
+- 使用 outbox + RabbitMQ 保证图片业务变更和 AI 检索索引最终一致，业务写入与 outbox 落库同事务，并提供延迟重试、死信队列和定时补偿机制。
 - 支持多轮对话上下文、工具结果记忆和会话摘要持久化，能够处理“刚才第二张”“这些图片”等指代场景。
 - AI 自动标注接入统一标签体系，通过标签白名单和数量限制降低随机标签污染。
 - 前端 SSE 只展示必要工具进度和最终回答，支持图片缩略图、详情链接和空间分析报告排版。
